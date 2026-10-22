@@ -1,0 +1,89 @@
+[
+  {
+    "Id": "a1f0c3e2d4b5a1f0c3e2d4b5a1f0c3e2d4b5a1f0c3e2d4b5a1f0c3e2d4b5a1f0",
+    "Names": ["/proxy"],
+    "Image": "nginx:1.25.1",
+    "ImageID": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "State": "running",
+    "Ports": [
+      {"IP": "0.0.0.0", "PrivatePort": 80, "PublicPort": 80, "Type": "tcp"},
+      {"IP": "0.0.0.0", "PrivatePort": 443, "PublicPort": 443, "Type": "tcp"},
+      {"IP": "::", "PrivatePort": 443, "PublicPort": 443, "Type": "tcp"}
+    ],
+    "Labels": {"com.docker.compose.service": "proxy"},
+    "HostConfig": {"NetworkMode": "edge"},
+    "NetworkSettings": {"Networks": {"edge": {"IPAddress": "172.20.0.2"}}}
+  },
+  {
+    "Id": "b2e1d4f3c5a6b2e1d4f3c5a6b2e1d4f3c5a6b2e1d4f3c5a6b2e1d4f3c5a6b2e1",
+    "Names": ["/gitea"],
+    "Image": "gitea/gitea:1.16.0",
+    "ImageID": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "State": "running",
+    "Ports": [{"PrivatePort": 3000, "Type": "tcp"}, {"PrivatePort": 22, "Type": "tcp"}],
+    "Labels": {"com.docker.compose.service": "gitea"},
+    "HostConfig": {"NetworkMode": "edge"},
+    "NetworkSettings": {"Networks": {"edge": {"IPAddress": "172.20.0.3"}, "gitea_db": {"IPAddress": "172.21.0.2"}}}
+  },
+  {
+    "Id": "c3f2e5a4d6b7c3f2e5a4d6b7c3f2e5a4d6b7c3f2e5a4d6b7c3f2e5a4d6b7c3f2",
+    "Names": ["/grafana"],
+    "Image": "grafana/grafana:8.3.0",
+    "ImageID": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "State": "running",
+    "Ports": [{"IP": "192.168.50.10", "PrivatePort": 3000, "PublicPort": 3000, "Type": "tcp"}],
+    "Labels": {"com.docker.compose.service": "grafana"},
+    "HostConfig": {"NetworkMode": "monitoring"},
+    "NetworkSettings": {"Networks": {"monitoring": {"IPAddress": "172.22.0.2"}}}
+  },
+  {
+    "Id": "d4a3f6b5e7c8d4a3f6b5e7c8d4a3f6b5e7c8d4a3f6b5e7c8d4a3f6b5e7c8d4a3",
+    "Names": ["/gitea-db"],
+    "Image": "postgres:13.2",
+    "ImageID": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "State": "running",
+    "Ports": [{"PrivatePort": 5432, "Type": "tcp"}],
+    "Labels": {"com.docker.compose.service": "db"},
+    "HostConfig": {"NetworkMode": "gitea_db"},
+    "NetworkSettings": {"Networks": {"gitea_db": {"IPAddress": "172.21.0.3"}}}
+  },
+  {
+    "Id": "e5b4a7c6f8d9e5b4a7c6f8d9e5b4a7c6f8d9e5b4a7c6f8d9e5b4a7c6f8d9e5b4",
+    "Names": ["/cache"],
+    "Image": "redis:6.2.6",
+    "ImageID": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "State": "running",
+    "Ports": [{"IP": "127.0.0.1", "PrivatePort": 6379, "PublicPort": 6379, "Type": "tcp"}],
+    "Labels": {"com.docker.compose.service": "cache"},
+    "HostConfig": {"NetworkMode": "bridge"},
+    "NetworkSettings": {"Networks": {"bridge": {"IPAddress": "172.17.0.2"}}}
+  },
+  {
+    "Id": "f6c5b8d7a9e0f6c5b8d7a9e0f6c5b8d7a9e0f6c5b8d7a9e0f6c5b8d7a9e0f6c5",
+    "Names": ["/webapp"],
+    "Image": "python:3.11.4-slim",
+    "ImageID": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "State": "running",
+    "Ports": [{"PrivatePort": 8000, "Type": "tcp"}],
+    "Labels": {
+      "com.docker.compose.service": "webapp",
+      "traefik.enable": "true",
+      "traefik.http.routers.webapp.rule": "Host(`app.example.com`)",
+      "traefik.http.routers.webapp.entrypoints": "websecure",
+      "traefik.http.services.webapp.loadbalancer.server.port": "8000"
+    },
+    "HostConfig": {"NetworkMode": "edge"},
+    "NetworkSettings": {"Networks": {"edge": {"IPAddress": "172.20.0.4"}}}
+  },
+  {
+    "Id": "0a7d6c9e8b1f0a7d6c9e8b1f0a7d6c9e8b1f0a7d6c9e8b1f0a7d6c9e8b1f0a7d",
+    "Names": ["/webapp-worker"],
+    "Image": "python:3.11.4-slim",
+    "ImageID": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "State": "running",
+    "Ports": [],
+    "Labels": {"com.docker.compose.service": "worker"},
+    "HostConfig": {"NetworkMode": "edge"},
+    "NetworkSettings": {"Networks": {"edge": {"IPAddress": "172.20.0.5"}}}
+  }
+]
