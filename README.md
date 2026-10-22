@@ -7,7 +7,7 @@ enriches findings with real-world exploit intelligence, ranks them by actual ris
 instead of CVSS alone, and writes a short report: *fix these N things first, here's why,
 here's the fix.*
 
-> Status: under active development. Scanning, enrichment, exposure, scoring, the LLM agent, dashboard, nightly pipeline and alerts are complete.
+> Status: under active development. All features are implemented; documentation polish in progress.
 
 ## What works today
 
@@ -62,6 +62,13 @@ here's the fix.*
   score breakdown and intel, and rendered reports. Optional basic auth.
 - **Alerts** (Telegram and/or SMTP, off by default) are sent only for *new* KEV-listed or
   high-risk internet-exposed findings, once per finding.
+
+- **Evaluation** (`vulntriage eval [--demo]` → [docs/EVALUATION.md](docs/EVALUATION.md)):
+  KEV recall@10/@20 against CVSS-only, EPSS-only and KEV-ablated rankings, noise
+  reduction, grounding rate over recent reports with a hallucination self-test, and
+  runtime per pipeline stage. On the demo dataset, 4,247 open findings come down to
+  220 that need action (94.8% noise reduction) and 11 remediation actions, with KEV
+  recall@20 of 100% vs. 0% for CVSS-only.
 
 ![Dashboard overview (demo data)](docs/img/dashboard-overview.png)
 

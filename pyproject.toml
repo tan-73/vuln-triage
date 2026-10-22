@@ -69,6 +69,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "S", "RUF"]
+allowed-confusables = ["×", "→", "≥", "–"]
 ignore = [
     "S101",   # assert is fine in tests
     "S603",   # subprocess without shell=True is what we want
@@ -78,6 +79,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B011", "E501"]
 "scripts/**" = ["E501", "T201"]
+"vulntriage/evaluation.py" = ["E501"]  # long Markdown table rows
 
 [tool.mypy]
 python_version = "3.11"

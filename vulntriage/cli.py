@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -366,6 +367,57 @@ def scheduler() -> None:
     from vulntriage.scheduler import run_blocking
 
     run_blocking(get_settings())
+
+
+@app.command("eval")
+def eval_cmd(
+    demo: Annotated[
+        bool, typer.Option("--demo", help="Rebuild and evaluate the bundled demo dataset.")
+    ] = False,
+    output: Annotated[Path, typer.Option(help="Markdown file to write.")] = Path(
+        "docs/EVALUATION.md"
+    ),
+    reports: Annotated[int, typer.Option(help="Grounding rate over the last N reports.")] = 10,
+) -> None:
+    """Measure KEV recall vs. baselines, noise reduction, grounding rate and stage runtimes."""
+    import json
+    from datetime import datetime
+
+    from sqlalchemy.orm import sessionmaker
+
+    from vulntriage.agent.report import generate_report
+    from vulntriage.evaluation import DEMO_DATASET, REPRODUCE, evaluate, render_markdown
+    from vulntriage.llm.mock import MockProvider
+
+    settings = get_settings()
+    dataset = "this homelab's live database"
+    if demo:
+        from vulntriage.demo import fixtures_dir, run_demo
+
+        meta = json.loads((fixtures_dir() / "intel/meta.json").read_text())
+        captured = datetime.fromisoformat(meta["captured_at"])
+        settings, _ = run_demo(settings, now=captured)
+        dataset = DEMO_DATASET.format(captured=f"captured {captured.date().isoformat()}")
+    engine = _engine(settings)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as probe:  # grounding self-test; rolled back, never stored
+        selftest = generate_report(
+            probe,
+            settings,
+            MockProvider(top_n=settings.report_top_n, hallucinate=True),
+            write=False,
+        ).grounding
+        probe.rollback()
+    with session_scope(engine) as session:
+        result = evaluate(session, settings, reports, selftest)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(render_markdown(result, dataset, REPRODUCE), encoding="utf-8")
+    vt = result.rankings[0]
+    console.print(
+        f"wrote [bold]{output}[/bold]: {result.open_findings:,} open -> {result.actionable:,} "
+        f"need action; KEV recall@10 {vt.recall[10]:.0%}, @20 {vt.recall[20]:.0%}; grounding "
+        + (f"{result.grounding_micro:.1%}" if result.grounding_micro is not None else "n/a")
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
