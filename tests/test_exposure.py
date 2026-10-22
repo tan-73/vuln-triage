@@ -88,7 +88,11 @@ def test_public_cidr_in_allow_list_is_rejected() -> None:
         ScanScopeGuard(["203.0.113.0/24"])
     with pytest.raises(pydantic.ValidationError, match="private ranges"):
         Settings(_env_file=None, allowed_scan_cidrs="192.168.50.0/24,203.0.113.0/24")  # type: ignore[call-arg]
-    assert Settings(_env_file=None).allowed_scan_cidrs == ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]  # type: ignore[call-arg]
+    assert Settings(_env_file=None).allowed_scan_cidrs == [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+    ]  # type: ignore[call-arg]
 
 
 # --- nmap ------------------------------------------------------------------------------------
@@ -128,13 +132,24 @@ def test_run_nmap_records_errors() -> None:
 
 
 def test_parse_nginx_proxy_manager_configs() -> None:
-    routes, errors = load_routes([("proxy", str(FIXTURES / "proxy/nginx"))], [], [], traefik_labels=False)
+    routes, errors = load_routes(
+        [("proxy", str(FIXTURES / "proxy/nginx"))], [], [], traefik_labels=False
+    )
     assert not errors
     by_host = {r.hostnames[0]: r for r in routes}
     git = by_host["git.example.com"]
-    assert (git.upstream_host, git.upstream_port, git.owner, git.lan_only) == ("gitea", 3000, "proxy", False)
+    assert (git.upstream_host, git.upstream_port, git.owner, git.lan_only) == (
+        "gitea",
+        3000,
+        "proxy",
+        False,
+    )
     grafana = by_host["grafana.home.arpa"]
-    assert (grafana.upstream_host, grafana.upstream_port, grafana.lan_only) == ("192.168.50.10", 3000, True)
+    assert (grafana.upstream_host, grafana.upstream_port, grafana.lan_only) == (
+        "192.168.50.10",
+        3000,
+        True,
+    )
 
 
 def test_parse_nginx_plain_proxy_pass_and_upstreams() -> None:
@@ -171,11 +186,19 @@ def test_parse_caddyfile_fixture() -> None:
 def test_parse_traefik_labels() -> None:
     webapp = next(c for c in containers() if c.name == "webapp")
     (route,) = parse_traefik_labels(webapp)
-    assert (route.hostnames, route.upstream_port, route.target_container) == (["app.example.com"], 8000, "webapp")
+    assert (route.hostnames, route.upstream_port, route.target_container) == (
+        ["app.example.com"],
+        8000,
+        "webapp",
+    )
     disabled = webapp.model_copy(update={"labels": {**webapp.labels, "traefik.enable": "false"}})
     assert parse_traefik_labels(disabled) == []
     multi = webapp.model_copy(
-        update={"labels": {"traefik.http.routers.r.rule": "Host(`a.example.com`, `b.example.com`) || Host(`c.lan`)"}}
+        update={
+            "labels": {
+                "traefik.http.routers.r.rule": "Host(`a.example.com`, `b.example.com`) || Host(`c.lan`)"
+            }
+        }
     )
     assert parse_traefik_labels(multi)[0].hostnames == ["a.example.com", "b.example.com", "c.lan"]
 
@@ -263,7 +286,11 @@ def _ingest_demo_assets(session: Session) -> None:
     ]:
         spec = AssetSpec(AssetKind.IMAGE, name, tag, containers=conts)
         ingest_results(session, spec, [ScanResult(scanner="trivy", artifact_name=name)])
-    ingest_results(session, AssetSpec(AssetKind.HOST, "nas"), [ScanResult(scanner="trivy", artifact_name="nas")])
+    ingest_results(
+        session,
+        AssetSpec(AssetKind.HOST, "nas"),
+        [ScanResult(scanner="trivy", artifact_name="nas")],
+    )
 
 
 def test_apply_exposure_with_overrides(session: Session, demo_settings: Settings) -> None:
@@ -277,7 +304,10 @@ def test_apply_exposure_with_overrides(session: Session, demo_settings: Settings
     assert assets["gitea/gitea:1.16.0"].exposure_level == "internet"
     assert assets["redis:6.2.6"].exposure_level == "localhost"
     assert assets["python:3.11.4-slim"].exposure_level == "internet"
-    assert any(e.startswith("webapp: traefik route") for e in assets["python:3.11.4-slim"].exposure_evidence)
+    assert any(
+        e.startswith("webapp: traefik route")
+        for e in assets["python:3.11.4-slim"].exposure_evidence
+    )
     assert assets["postgres:13.2"].exposure_level == "lan"
     assert "override: EXPOSURE_OVERRIDES sets lan" in assets["postgres:13.2"].exposure_evidence
     assert assets["host:nas"].exposure_level == "lan"

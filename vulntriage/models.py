@@ -159,6 +159,13 @@ class Finding(Base):
     status: Mapped[str] = mapped_column(String(16), default=FindingStatus.OPEN, index=True)
     resolved_at: Mapped[datetime | None]
     resolution_reason: Mapped[str | None] = mapped_column(String(64))
+    #: Deterministic risk score (see ``vulntriage.scoring``); ``None`` until scored.
+    score: Mapped[float | None] = mapped_column(Float, index=True)
+    #: Machine- and human-readable explanation of ``score``.
+    score_breakdown: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    #: Key of the remediation group this finding belongs to.
+    remediation_key: Mapped[str | None] = mapped_column(String(512), index=True)
+    alerted_at: Mapped[datetime | None]
 
     asset: Mapped[Asset] = relationship(back_populates="findings")
 

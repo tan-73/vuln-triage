@@ -151,7 +151,7 @@ def list_findings(
     kev: Annotated[bool, typer.Option("--kev", help="Only KEV-listed CVEs.")] = False,
     limit: Annotated[int, typer.Option(help="Maximum rows.")] = 50,
 ) -> None:
-    """List stored findings (highest severity first)."""
+    """List stored findings (highest risk score first, then severity)."""
     from vulntriage.scanners.ingest import SEVERITY_RANK
 
     engine = _engine(get_settings())
@@ -184,7 +184,7 @@ def list_findings(
                 f.installed_version,
                 f.fixed_version or "-",
                 f.severity,
-                f"{getattr(f, 'score', None) or 0:.1f}",
+                f"{f.score or 0:.1f}",
             )
         console.print(table)
 
@@ -192,9 +192,70 @@ def list_findings(
 def _sort_key(finding: Finding, intel: CveIntel | None) -> tuple[float, int, float]:
     from vulntriage.scanners.ingest import SEVERITY_RANK
 
-    score = getattr(finding, "score", None) or 0.0
+    score = finding.score or 0.0
     cvss = intel.cvss_score if intel and intel.cvss_score is not None else 0.0
     return (score, SEVERITY_RANK.get(finding.severity, 0), cvss)
+
+
+@app.command()
+def score() -> None:
+    """Score open findings and rank remediation groups (deterministic, no LLM)."""
+    from vulntriage.pipeline import run_score_stage
+
+    settings = get_settings()
+    with session_scope(_engine(settings)) as session:
+        run = start_run(session, "cli-score")
+        with StageTimer(run).stage("score"):
+            summary, groups = run_score_stage(session, settings)
+        finish_run(run)
+    console.print(
+        f"scored [bold]{summary.scored}[/bold] open findings: {summary.actionable} need action "
+        f"(score >= {settings.action_threshold}), {summary.kev} KEV-listed; "
+        f"{len(groups)} remediation groups"
+    )
+
+
+@app.command()
+def groups(
+    limit: Annotated[int, typer.Option(help="Maximum groups to show.")] = 15,
+) -> None:
+    """Show remediation actions ranked by risk."""
+    from vulntriage.remediation import build_groups
+
+    settings = get_settings()
+    with session_scope(_engine(settings)) as session:
+        ranked = build_groups(session, settings)
+    table = Table(title=f"{len(ranked)} remediation groups")
+    for col in ("#", "action", "exposure", "findings", "KEV", "max score", "command"):
+        table.add_column(col)
+    for g in ranked[:limit]:
+        table.add_row(
+            str(g.rank),
+            g.title,
+            g.exposure,
+            str(g.finding_count),
+            ", ".join(g.kev_cves) or "-",
+            f"{g.max_score:.1f}",
+            g.command or "-",
+        )
+    console.print(table)
+
+
+@app.command()
+def explain(finding_id: Annotated[int, typer.Argument(help="Finding id.")]) -> None:
+    """Show why a finding scored the way it did."""
+    settings = get_settings()
+    with session_scope(_engine(settings)) as session:
+        finding = session.get(Finding, finding_id)
+        if finding is None:
+            console.print(f"[red]no finding {finding_id}[/red]")
+            raise typer.Exit(1)
+        console.print(
+            f"[bold]{finding.cve_id}[/bold] in {finding.package_name} {finding.installed_version} "
+            f"on {finding.asset.ref}: score {finding.score or 0:.2f}"
+        )
+        for line in (finding.score_breakdown or {}).get("text", []):
+            console.print(f"  - {line}")
 
 
 if __name__ == "__main__":  # pragma: no cover

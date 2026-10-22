@@ -22,6 +22,7 @@ from vulntriage.exposure.guard import ScanScopeGuard
 from vulntriage.exposure.nmap import NmapResult, run_nmap
 from vulntriage.exposure.proxies import load_routes
 from vulntriage.models import AssetKind, ScanRun, utcnow
+from vulntriage.remediation import RemediationGroup, build_groups
 from vulntriage.scanners.base import Runner
 from vulntriage.scanners.docker_api import ContainerInfo, DockerClient
 from vulntriage.scanners.grype import GrypeRunner
@@ -34,6 +35,7 @@ from vulntriage.scanners.service import (
     scan_specs,
 )
 from vulntriage.scanners.trivy import TrivyRunner
+from vulntriage.scoring import ScoringSummary, score_all
 
 log = logging.getLogger(__name__)
 
@@ -157,6 +159,15 @@ def run_exposure_stage(
     summary.errors = errors
     run.errors = [*run.errors, *errors]
     return summary
+
+
+def run_score_stage(
+    session: Session, settings: Settings
+) -> tuple[ScoringSummary, list[RemediationGroup]]:
+    """Score every open finding, then assign and rank remediation groups."""
+    summary = score_all(session, settings)
+    groups = build_groups(session, settings, assign_keys=True)
+    return summary, groups
 
 
 def start_run(session: Session, trigger: str) -> ScanRun:

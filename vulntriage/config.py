@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 #: Address space that is never routable on the public Internet. Only CIDRs inside these
@@ -75,6 +75,23 @@ class ScoringWeights(BaseModel):
         0.0, description="EPSS value assumed when no EPSS score is available."
     )
 
+    @model_validator(mode="after")
+    def _kev_tier_dominates(self) -> ScoringWeights:
+        """Guarantee hard rule: every KEV finding outranks every non-KEV finding."""
+        max_exposure = max(
+            self.exposure_internet, self.exposure_lan, self.exposure_localhost, self.exposure_none
+        )
+        best_non_kev = (
+            self.epss_scale * max_exposure * max(self.fix_available_multiplier, 1.0)
+            + self.cvss_weight
+        )
+        if self.kev_tier_offset <= best_non_kev:
+            raise ValueError(
+                f"kev_tier_offset ({self.kev_tier_offset}) must exceed the best possible "
+                f"non-KEV score ({best_non_kev:.1f})"
+            )
+        return self
+
 
 class Settings(BaseSettings):
     """All VulnTriage settings. Field names map 1:1 to upper-case environment variables."""
@@ -101,6 +118,10 @@ class Settings(BaseSettings):
     trivy_extra_args: CsvList = []
     exclude_images: CsvList = Field(
         default_factory=list, description="Glob patterns of image refs to skip."
+    )
+    own_image_patterns: CsvList = Field(
+        default_factory=list,
+        description="Globs of images you build yourself (fixes become package bumps/rebuilds).",
     )
     host_scan_targets: CsvList = Field(
         default_factory=list,
@@ -197,6 +218,7 @@ class Settings(BaseSettings):
     @field_validator(
         "trivy_extra_args",
         "exclude_images",
+        "own_image_patterns",
         "host_scan_targets",
         "fs_scan_targets",
         "allowed_scan_cidrs",
