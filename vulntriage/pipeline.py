@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,8 +17,13 @@ from contextlib import contextmanager
 from sqlalchemy.orm import Session
 
 from vulntriage.config import Settings
+from vulntriage.exposure.analyze import ExposureSummary, apply_exposure
+from vulntriage.exposure.guard import ScanScopeGuard
+from vulntriage.exposure.nmap import NmapResult, run_nmap
+from vulntriage.exposure.proxies import load_routes
 from vulntriage.models import AssetKind, ScanRun, utcnow
-from vulntriage.scanners.docker_api import DockerClient
+from vulntriage.scanners.base import Runner
+from vulntriage.scanners.docker_api import ContainerInfo, DockerClient
 from vulntriage.scanners.grype import GrypeRunner
 from vulntriage.scanners.ingest import AssetSpec, parse_image_ref
 from vulntriage.scanners.service import (
@@ -108,6 +114,48 @@ def run_scan_stage(
     run.findings_new = summary.findings_new
     run.findings_resolved = summary.findings_resolved
     run.errors = [*run.errors, *summary.errors]
+    return summary
+
+
+def run_exposure_stage(
+    session: Session,
+    settings: Settings,
+    run: ScanRun,
+    docker: DockerClient | None = None,
+    containers: list[ContainerInfo] | None = None,
+    nmap_runner: Runner = subprocess.run,
+) -> ExposureSummary | None:
+    """Work out how reachable each asset is and store it on the asset.
+
+    Returns ``None`` (leaving the previous exposure in place) if containers cannot be
+    listed, because an empty container list would wrongly downgrade every asset.
+    """
+    if containers is None:
+        try:
+            containers = docker.list_containers() if docker is not None else []
+        except Exception as exc:  # any failure: keep last known exposure
+            run.errors = [*run.errors, f"exposure: container listing failed: {exc}"]
+            return None
+    routes, errors = load_routes(
+        settings.parsed_targets("nginx_config_paths"),
+        settings.parsed_targets("caddy_config_paths"),
+        containers,
+        settings.traefik_labels,
+    )
+    nmap: NmapResult | None = None
+    if settings.nmap_enabled and settings.nmap_targets:
+        guard = ScanScopeGuard(settings.allowed_scan_cidrs)
+        nmap = run_nmap(
+            settings.nmap_targets,
+            guard,
+            settings.nmap_bin,
+            settings.nmap_top_ports,
+            runner=nmap_runner,
+        )
+        errors += nmap.refused + nmap.errors
+    summary = apply_exposure(session, settings, containers, routes, nmap)
+    summary.errors = errors
+    run.errors = [*run.errors, *errors]
     return summary
 
 

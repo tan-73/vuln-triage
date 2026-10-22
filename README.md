@@ -7,7 +7,7 @@ enriches findings with real-world exploit intelligence, ranks them by actual ris
 instead of CVSS alone, and writes a short report: *fix these N things first, here's why,
 here's the fix.*
 
-> Status: under active development. Scanning, ingestion and threat-intel enrichment are complete.
+> Status: under active development. Scanning, enrichment and exposure analysis are complete.
 
 ## What works today
 
@@ -28,6 +28,16 @@ here's the fix.*
   - **Offline tolerance**: every feed is cached locally with a timestamp and only
     refetched after its TTL. If a feed is unreachable, or `OFFLINE=true` is set, the cache
     is used and its age is reported (`vulntriage feeds`).
+- **Exposure analysis** gives each asset a level of `internet`, `lan`, `localhost` or `none`,
+  with evidence, from:
+  - Docker published ports: `0.0.0.0` counts as LAN, `127.0.0.1` as localhost, and a
+    public bind address as internet;
+  - reverse-proxy routes in **Nginx** (including Nginx Proxy Manager's generated files),
+    **Caddyfiles** and **Traefik labels**, where a hostname matching
+    `INTERNET_HOSTNAME_PATTERNS` counts as internet;
+  - an optional **nmap** connect scan, which is only allowed against `ALLOWED_SCAN_CIDRS`.
+    Those must be private ranges: a public CIDR in the allow-list is a startup error,
+    and every refused target is logged.
 
 ```bash
 pip install -e ".[dev]"
@@ -35,6 +45,7 @@ vulntriage scan                       # all running containers + configured host
 vulntriage scan --image nginx:1.25.1  # just one image
 vulntriage enrich                     # EPSS / KEV / NVD / OSV
 vulntriage feeds                      # cache age and last error per feed
+vulntriage exposure                   # internet / lan / localhost / none, with evidence
 vulntriage list-findings --kev
 ```
 

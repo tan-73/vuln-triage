@@ -69,6 +69,25 @@ class AssetKind(StrEnum):
     FS = "fs"
 
 
+class ExposureLevel(StrEnum):
+    """How reachable an asset is, from most to least exposed."""
+
+    INTERNET = "internet"
+    LAN = "lan"
+    LOCALHOST = "localhost"
+    NONE = "none"
+
+    @property
+    def rank(self) -> int:
+        """3 for internet down to 0 for none; higher means more exposed."""
+        return {"internet": 3, "lan": 2, "localhost": 1, "none": 0}[self.value]
+
+    @classmethod
+    def most_exposed(cls, levels: list[ExposureLevel]) -> ExposureLevel:
+        """The highest exposure in ``levels`` (``NONE`` for an empty list)."""
+        return max(levels, key=lambda lvl: lvl.rank, default=cls.NONE)
+
+
 class FindingStatus(StrEnum):
     """Lifecycle of a finding across scan runs."""
 
@@ -93,6 +112,10 @@ class Asset(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     first_seen: Mapped[datetime] = mapped_column(default=utcnow)
     last_scanned: Mapped[datetime | None]
+    exposure_level: Mapped[str] = mapped_column(String(16), default=ExposureLevel.NONE)
+    #: Human-readable reasons for ``exposure_level`` (one string per signal).
+    exposure_evidence: Mapped[list[str]] = mapped_column(default=list)
+    exposure_updated_at: Mapped[datetime | None]
 
     findings: Mapped[list[Finding]] = relationship(
         back_populates="asset", cascade="all, delete-orphan"

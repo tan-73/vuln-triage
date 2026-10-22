@@ -145,6 +145,13 @@ class Settings(BaseSettings):
         default_factory=list, description="Files or directories (e.g. NPM's /data/nginx)."
     )
     traefik_labels: bool = True
+    exposure_overrides: CsvList = Field(
+        default_factory=list,
+        description="'asset-name=level' pairs that force an exposure level, e.g. 'nas=lan'.",
+    )
+    host_exposure: Literal["internet", "lan", "localhost", "none"] = Field(
+        "lan", description="Default exposure of host (rootfs) assets."
+    )
     internet_hostname_patterns: CsvList = Field(
         default_factory=list,
         description="Globs of proxy hostnames reachable from the Internet, e.g. '*.example.com'.",
@@ -198,6 +205,7 @@ class Settings(BaseSettings):
         "caddy_config_paths",
         "nginx_config_paths",
         "internet_hostname_patterns",
+        "exposure_overrides",
         "smtp_to",
         mode="before",
     )

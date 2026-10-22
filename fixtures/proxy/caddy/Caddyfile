@@ -1,0 +1,26 @@
+{
+	email admin@example.com
+}
+
+(common) {
+	encode gzip
+}
+
+docs.example.com, www.docs.example.com {
+	import common
+	reverse_proxy wiki:8080
+}
+
+https://media.home.arpa:8443 {
+	@outside not remote_ip private_ranges
+	abort @outside
+	@lan remote_ip 192.168.0.0/16 10.0.0.0/8
+	reverse_proxy @lan jellyfin:8096
+}
+
+status.example.com {
+	reverse_proxy {
+		to http://uptime:3001 http://uptime-2:3001
+		header_up Host {upstream_hostport}
+	}
+}

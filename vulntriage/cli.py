@@ -118,6 +118,31 @@ def feeds() -> None:
             console.print(health.describe())
 
 
+@app.command()
+def exposure() -> None:
+    """Compute how reachable each asset is (internet / lan / localhost / none) and show why."""
+    from vulntriage.pipeline import run_exposure_stage
+
+    settings = get_settings()
+    engine = _engine(settings)
+    with session_scope(engine) as session:
+        run = start_run(session, "cli-exposure")
+        with StageTimer(run).stage("exposure"):
+            summary = run_exposure_stage(session, settings, run, DockerClient(settings.docker_host))
+        finish_run(run)
+        if summary is None:
+            console.print("[red]container listing failed; previous exposure kept[/red]")
+            raise typer.Exit(1)
+        table = Table(title=f"exposure ({summary.routes} proxy routes)")
+        for col in ("asset", "level", "evidence"):
+            table.add_column(col)
+        for asset in session.scalars(select(Asset).where(Asset.active).order_by(Asset.name)):
+            table.add_row(asset.ref, asset.exposure_level, "\n".join(asset.exposure_evidence))
+        console.print(table)
+        for err in summary.errors:
+            console.print(f"[yellow]warning:[/yellow] {err}")
+
+
 @app.command("list-findings")
 def list_findings(
     status: Annotated[str, typer.Option(help="open | resolved | all")] = "open",
