@@ -258,5 +258,37 @@ def explain(finding_id: Annotated[int, typer.Argument(help="Finding id.")]) -> N
             console.print(f"  - {line}")
 
 
+@app.command()
+def report(
+    provider: Annotated[
+        str | None, typer.Option(help="Override LLM_PROVIDER (mock|anthropic|gemini|openai).")
+    ] = None,
+) -> None:
+    """Run the LLM triage agent and write reports/YYYY-MM-DD.md."""
+    from vulntriage.agent.report import generate_report
+    from vulntriage.intel.cache import feed_health
+    from vulntriage.intel.enrich import ttl_map
+    from vulntriage.llm.factory import get_provider
+
+    settings = get_settings()
+    llm = get_provider(settings, provider)
+    with session_scope(_engine(settings)) as session:
+        run = start_run(session, "cli-report")
+        with StageTimer(run).stage("report"):
+            outcome = generate_report(
+                session, settings, llm, run, feed_health(session, ttl_map(settings))
+            )
+        if outcome.agent.error:
+            run.errors = [*run.errors, f"agent: {outcome.agent.error}"]
+        finish_run(run)
+    g = outcome.grounding
+    console.print(
+        f"report written to [bold]{outcome.path}[/bold]; grounding {g.verified}/{g.total} "
+        f"claims verified ({g.rate:.1%})"
+    )
+    if outcome.agent.error:
+        console.print(f"[yellow]agent error:[/yellow] {outcome.agent.error}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

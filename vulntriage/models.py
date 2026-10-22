@@ -234,3 +234,29 @@ class FeedStatus(Base):
     last_success_at: Mapped[datetime | None]
     last_attempt_at: Mapped[datetime | None]
     last_error: Mapped[str | None] = mapped_column(Text)
+
+
+class Report(Base):
+    """One generated triage report and its grounding statistics."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow, index=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("scan_runs.id", ondelete="SET NULL"))
+    report_date: Mapped[str] = mapped_column(String(10))
+    path: Mapped[str | None] = mapped_column(String(1024))
+    markdown: Mapped[str] = mapped_column(Text, default="")
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(128))
+    raw_findings: Mapped[int] = mapped_column(Integer, default=0)
+    actionable_findings: Mapped[int] = mapped_column(Integer, default=0)
+    kev_findings: Mapped[int] = mapped_column(Integer, default=0)
+    grounding_total: Mapped[int] = mapped_column(Integer, default=0)
+    grounding_verified: Mapped[int] = mapped_column(Integer, default=0)
+    #: ``None`` when the report made no checkable claims (e.g. the LLM call failed).
+    grounding_rate: Mapped[float | None] = mapped_column(Float)
+    flagged_claims: Mapped[list[Any]] = mapped_column(default=list)
+    agent_turns: Mapped[int] = mapped_column(Integer, default=0)
+    tool_calls: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)

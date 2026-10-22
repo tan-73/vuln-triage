@@ -146,6 +146,11 @@ class RemediationGroup:
         return data
 
 
+def is_deferrable(group: RemediationGroup, threshold: float) -> bool:
+    """Below the action threshold, no KEV CVE, and not internet-exposed."""
+    return group.max_score < threshold and not group.kev_cves and group.exposure != "internet"
+
+
 def is_own_image(asset: Asset, settings: Settings) -> bool:
     """True if the image is built locally (matches ``OWN_IMAGE_PATTERNS``)."""
     return any(fnmatch.fnmatch(asset.ref, pat) for pat in settings.own_image_patterns)

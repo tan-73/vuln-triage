@@ -7,7 +7,7 @@ enriches findings with real-world exploit intelligence, ranks them by actual ris
 instead of CVSS alone, and writes a short report: *fix these N things first, here's why,
 here's the fix.*
 
-> Status: under active development. Scanning, enrichment, exposure analysis and risk scoring are complete.
+> Status: under active development. Scanning, enrichment, exposure analysis, risk scoring and the LLM triage agent are complete.
 
 ## What works today
 
@@ -46,6 +46,14 @@ here's the fix.*
   example "Update image grafana/grafana:8.3.0 (fixes 505 findings in 35 packages)" with
   `docker pull grafana/grafana:8.3`. Groups are ranked by risk and list the exact fixed
   version of every package.
+- **LLM triage agent** ([docs/AGENT.md](docs/AGENT.md)): read-only tools, native tool
+  calling for Anthropic, Gemini and any OpenAI-compatible endpoint (including Ollama),
+  plus a deterministic mock for demos. The agent writes the executive summary, explains
+  each "fix first" action and lists what is safe to defer. A **grounding post-check**
+  verifies every CVE ID, version, package/version/asset association, EPSS, CVSS, KEV and
+  exposure claim against the tool results, strips anything unsupported, and logs and
+  stores the grounding rate. Advisory text is wrapped as untrusted data to guard against
+  prompt injection.
 
 ```bash
 pip install -e ".[dev]"
@@ -57,6 +65,7 @@ vulntriage exposure                   # internet / lan / localhost / none, with 
 vulntriage score                      # deterministic risk score + remediation groups
 vulntriage groups                     # ranked "fix this first" actions
 vulntriage explain 42                 # why finding 42 scored what it did
+vulntriage report                     # LLM report -> reports/YYYY-MM-DD.md
 vulntriage list-findings --kev
 ```
 
