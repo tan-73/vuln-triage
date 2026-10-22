@@ -1,0 +1,70 @@
+{% macro exposure(level) -%}
+{%- set icons = {"internet": "▲", "lan": "◆", "localhost": "●", "none": "○"} -%}
+<span class="badge exp-{{ level }}"><span aria-hidden="true">{{ icons.get(level, "?") }}</span> {{ level }}</span>
+{%- endmacro %}
+
+{% macro kev(flag) -%}
+{%- if flag %}<span class="badge kev"><span aria-hidden="true">!</span> KEV</span>{% endif -%}
+{%- endmacro %}
+
+{% macro score(value, threshold) -%}
+<span class="score {% if value is not none and value >= threshold %}hot{% endif %}">{{ "%.1f"|format(value or 0) }}</span>
+{%- endmacro %}
+
+{% macro chart(c) -%}
+<figure class="chart-card">
+  <figcaption>{{ c.title }}{% if c.last %} <span class="muted">· latest {{ c.last.value_text }}</span>{% endif %}</figcaption>
+  {% if c.empty %}
+  <p class="muted empty">No runs yet.</p>
+  {% else %}
+  <div class="chart" data-chart>
+    <svg viewBox="0 0 {{ c.width }} {{ c.height }}" role="img" aria-label="{{ c.title }} per nightly run">
+      {% for y, label in c.y_ticks %}
+      <line class="grid" x1="{{ c.pad_left }}" x2="{{ c.width - 16 }}" y1="{{ y }}" y2="{{ y }}"></line>
+      <text class="tick" x="{{ c.pad_left - 6 }}" y="{{ y + 3 }}" text-anchor="end">{{ label }}</text>
+      {% endfor %}
+      {% for x, label in c.x_labels %}
+      <text class="tick" x="{{ x }}" y="{{ c.height - 6 }}" text-anchor="{{ 'start' if loop.first and c.x_labels|length > 1 else ('end' if loop.last and c.x_labels|length > 1 else 'middle') }}">{{ label }}</text>
+      {% endfor %}
+      <path class="area" d="{{ c.area }}"></path>
+      <path class="line" d="{{ c.path }}"></path>
+      <line class="crosshair" x1="0" x2="0" y1="12" y2="{{ c.height - c.pad_bottom }}"></line>
+      {% for p in c.points %}
+      <circle class="dot{% if loop.last %} end{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="4" data-x="{{ p.x }}" data-label="{{ p.label }}" data-value="{{ p.value_text }}"><title>{{ p.label }}: {{ p.value_text }}</title></circle>
+      {% endfor %}
+      <rect class="hit" x="{{ c.pad_left }}" y="0" width="{{ c.width - c.pad_left - 16 }}" height="{{ c.height - c.pad_bottom }}"></rect>
+    </svg>
+    <div class="tooltip" hidden><strong></strong><span></span></div>
+  </div>
+  <details class="table-view"><summary>Table</summary>
+    <table><thead><tr><th>Run</th><th class="num">{{ c.title }}</th></tr></thead><tbody>
+    {% for p in c.points %}<tr><td>{{ p.label }}</td><td class="num">{{ p.value_text }}</td></tr>{% endfor %}
+    </tbody></table>
+  </details>
+  {% endif %}
+</figure>
+{%- endmacro %}
+
+{% macro group_row(g, threshold) -%}
+<tr>
+  <td class="num">{{ g.rank }}</td>
+  <td><strong>{{ g.title }}</strong>
+    {% if g.command %}<pre class="cmd"><code>{{ g.command }}</code></pre>{% endif %}
+    {% if g.packages %}
+    <details><summary>{{ g.packages|length }} packages</summary>
+      <table class="inner"><thead><tr><th>Package</th><th>Installed</th><th>Fixed in</th><th>CVEs</th></tr></thead><tbody>
+      {% for p in g.packages[:40] %}
+      <tr><td>{{ p.package }}</td><td><code>{{ p.installed }}</code></td><td><code>{{ p.fixed or "–" }}</code></td>
+      <td>{% for cve in p.cves[:6] %}{{ cve }}{% if cve in p.kev_cves %} {{ kev(true) }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% if p.cves|length > 6 %} +{{ p.cves|length - 6 }}{% endif %}</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </details>
+    {% endif %}
+    {% for note in g.notes %}<p class="note">{{ note }}</p>{% endfor %}
+  </td>
+  <td>{{ exposure(g.exposure) }}</td>
+  <td class="num nowrap">{{ g.finding_count }}<span class="muted"> / {{ g.actionable_count }}</span></td>
+  <td class="nowrap">{% for c in g.kev_cves %}{{ kev(true) }} {{ c }}<br>{% else %}<span class="muted">–</span>{% endfor %}</td>
+  <td class="num">{{ score(g.max_score, threshold) }}</td>
+</tr>
+{%- endmacro %}

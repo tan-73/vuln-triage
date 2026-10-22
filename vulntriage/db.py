@@ -39,6 +39,13 @@ def get_engine(database_url: str) -> Engine:
     return engine
 
 
+def dispose_engine(database_url: str) -> None:
+    """Close and forget the cached engine for ``database_url`` (e.g. before deleting its file)."""
+    engine = _engines.pop(database_url, None)
+    if engine is not None:
+        engine.dispose()
+
+
 def init_db(engine: Engine) -> None:
     """Create all tables that do not exist yet."""
     Base.metadata.create_all(engine)

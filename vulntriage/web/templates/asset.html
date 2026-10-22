@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import exposure, kev, score, group_row %}
+{% block title %}{{ asset.ref }} · VulnTriage{% endblock %}
+{% block content %}
+<h1>{{ asset.ref }} {{ exposure(asset.exposure_level) }}</h1>
+<p class="muted">{{ asset.kind }}{% if asset.os_family %} · {{ asset.os_family }} {{ asset.os_name or "" }}{% endif %}{% if asset.digest %} · <code>{{ asset.digest[:19] }}…</code>{% endif %} · {{ total }} open findings, {{ actionable }} need action</p>
+<h2>Why this exposure level</h2>
+<ul>{% for e in asset.exposure_evidence %}<li>{{ e }}</li>{% else %}<li class="muted">No evidence recorded.</li>{% endfor %}</ul>
+<h2>Actions for this asset</h2>
+<table class="data">
+  <thead><tr><th class="num">#</th><th>Action</th><th>Exposure</th><th class="num">Findings / need action</th><th>KEV</th><th class="num">Top score</th></tr></thead>
+  <tbody>{% for g in groups %}{{ group_row(g, settings.action_threshold) }}{% endfor %}</tbody>
+</table>
+<h2>Findings{% if total > rows|length %} (top {{ rows|length }} of {{ total }}){% endif %}</h2>
+<table class="data">
+  <thead><tr><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Severity</th><th class="num">EPSS</th><th class="num">Score</th></tr></thead>
+  <tbody>
+  {% for f, intel in rows %}
+  <tr>
+    <td><a href="/findings/{{ f.id }}">{{ f.cve_id }}</a> {{ kev(intel and intel.in_kev) }}</td>
+    <td>{{ f.package_name }}</td><td><code>{{ f.installed_version }}</code></td><td><code>{{ f.fixed_version or "–" }}</code></td>
+    <td>{{ f.severity }}</td>
+    <td class="num">{{ "%.4f"|format(intel.epss) if intel and intel.epss is not none else "–" }}</td>
+    <td class="num">{{ score(f.score, settings.action_threshold) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

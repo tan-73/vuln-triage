@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros.html" import exposure %}
+{% block title %}Assets · VulnTriage{% endblock %}
+{% block content %}
+<h1>Assets</h1>
+<table class="data">
+  <thead><tr><th>Asset</th><th>Kind</th><th>Exposure</th><th class="num">Open</th><th class="num">Need action</th><th class="num">KEV</th><th>Containers</th><th>Last scanned</th></tr></thead>
+  <tbody>
+  {% for a in assets %}{% set c = counts.get(a.id, (0, 0, 0)) %}
+  <tr>
+    <td><a href="/assets/{{ a.id }}">{{ a.ref }}</a>{% if a.os_family %} <span class="muted">{{ a.os_family }} {{ a.os_name or "" }}</span>{% endif %}</td>
+    <td>{{ a.kind }}</td><td>{{ exposure(a.exposure_level) }}</td>
+    <td class="num">{{ c[0] }}</td><td class="num">{{ c[1] or 0 }}</td><td class="num">{{ c[2] or 0 }}</td>
+    <td>{{ a.containers|join(", ") }}</td>
+    <td>{{ a.last_scanned.strftime("%Y-%m-%d %H:%M") if a.last_scanned else "–" }}</td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="muted">No assets yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

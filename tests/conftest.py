@@ -67,3 +67,18 @@ def session(engine: Engine) -> Iterator[Session]:
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as sess:
         yield sess
+
+
+@pytest.fixture(scope="session")
+def demo_env(tmp_path_factory: pytest.TempPathFactory) -> tuple[Settings, list[Any]]:
+    """Run the full fixture demo once per test session (about 15 s); reuse its database."""
+    from datetime import UTC, datetime
+
+    from vulntriage.demo import run_demo
+
+    base = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        data_dir=tmp_path_factory.mktemp("demo-data"),
+        reports_dir=tmp_path_factory.mktemp("demo-reports"),
+    )
+    return run_demo(base, now=datetime(2026, 10, 22, 6, 0, tzinfo=UTC))

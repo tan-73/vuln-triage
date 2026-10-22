@@ -290,5 +290,83 @@ def report(
         console.print(f"[yellow]agent error:[/yellow] {outcome.agent.error}")
 
 
+@app.command()
+def run(
+    demo: Annotated[
+        bool,
+        typer.Option("--demo", help="Use the bundled fixture homelab (no Docker/network/key)."),
+    ] = False,
+    no_alerts: Annotated[bool, typer.Option("--no-alerts", help="Skip alert delivery.")] = False,
+) -> None:
+    """Run the full nightly pipeline: scan, enrich, exposure, score, report, alerts."""
+    from vulntriage.pipeline import run_pipeline
+
+    settings = get_settings()
+    if demo:
+        from vulntriage.demo import run_demo
+
+        demo_cfg, results = run_demo(settings)
+        for res in results:
+            _print_result(res)
+        console.print(
+            f"\n[bold green]demo complete[/bold green]: database {demo_cfg.database_url}, "
+            f"reports in {demo_cfg.reports_dir}/. "
+            "Browse it with: [bold]vulntriage serve --demo[/bold]"
+        )
+        return
+    result = run_pipeline(_engine(settings), settings, trigger="cli", alerts=not no_alerts)
+    _print_result(result)
+    if result.status != "ok":
+        raise typer.Exit(1)
+
+
+def _print_result(res: object) -> None:
+    from vulntriage.pipeline import PipelineResult
+
+    assert isinstance(res, PipelineResult)
+    grounding = f"{res.grounding_rate:.1%}" if res.grounding_rate is not None else "n/a"
+    timings = ", ".join(f"{k} {v:.1f}s" for k, v in res.stage_timings.items())
+    console.print(
+        f"run {res.run_id} ({res.status}): {res.open_findings:,} open findings -> "
+        f"{res.actionable_findings:,} need action ({res.kev_findings} KEV); "
+        f"report {res.report_path} (grounding {grounding}); {timings}"
+    )
+    for err in res.errors:
+        console.print(f"  [yellow]warning:[/yellow] {err}")
+
+
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option(help="Bind address.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port.")] = 8080,
+    demo: Annotated[
+        bool, typer.Option("--demo", help="Serve the demo database (built if missing).")
+    ] = False,
+) -> None:
+    """Start the dashboard (and the nightly scheduler if SCHEDULE_ENABLED=true)."""
+    import uvicorn
+
+    from vulntriage.web.app import create_app
+
+    settings = get_settings()
+    if demo or settings.demo_mode:
+        from vulntriage.demo import demo_settings, run_demo
+
+        cfg = demo_settings(settings)
+        if not (cfg.data_dir / "demo.db").exists():
+            console.print("building demo database...")
+            cfg, _ = run_demo(settings)
+        settings = cfg.model_copy(update={"schedule_enabled": False})
+    uvicorn.run(create_app(settings), host=host, port=port, log_level="info", proxy_headers=False)
+
+
+@app.command()
+def scheduler() -> None:
+    """Run only the nightly scheduler in the foreground (SCHEDULE_CRON, SCHEDULE_TIMEZONE)."""
+    from vulntriage.scheduler import run_blocking
+
+    run_blocking(get_settings())
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

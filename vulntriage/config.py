@@ -198,10 +198,12 @@ class Settings(BaseSettings):
     # --- web / schedule / alerts ----------------------------------------------------------
     dashboard_user: str | None = None
     dashboard_password: SecretStr | None = None
+    demo_mode: bool = Field(False, description="Serve the bundled demo homelab instead.")
     schedule_enabled: bool = False
     schedule_cron: str = "30 2 * * *"
     schedule_timezone: str = "UTC"
 
+    dashboard_url: str | None = Field(None, description="Link included in alert messages.")
     alert_min_score: float = 50.0
     telegram_enabled: bool = False
     telegram_bot_token: SecretStr | None = None

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macros.html" import group_row %}
+{% block title %}Remediation groups · VulnTriage{% endblock %}
+{% block content %}
+<h1>Remediation actions, ranked</h1>
+<p class="muted">Each row is one action that closes every finding listed under it. Order is computed deterministically (KEV first, then EPSS × exposure); see the scoring docs.</p>
+<h2>Need action ({{ action|length }})</h2>
+<table class="data">
+  <thead><tr><th class="num">#</th><th>Action</th><th>Exposure</th><th class="num">Findings / need action</th><th>KEV</th><th class="num">Top score</th></tr></thead>
+  <tbody>{% for g in action %}{{ group_row(g, settings.action_threshold) }}{% endfor %}</tbody>
+</table>
+<h2>Below the threshold ({{ rest|length }})</h2>
+<p class="muted">{{ deferrable|length }} of these are safe to defer (no KEV, not internet-exposed).</p>
+<table class="data">
+  <thead><tr><th class="num">#</th><th>Action</th><th>Exposure</th><th class="num">Findings / need action</th><th>KEV</th><th class="num">Top score</th></tr></thead>
+  <tbody>{% for g in rest %}{{ group_row(g, settings.action_threshold) }}{% endfor %}</tbody>
+</table>
+{% endblock %}

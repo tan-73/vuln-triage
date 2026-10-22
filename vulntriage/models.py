@@ -209,6 +209,10 @@ class ScanRun(Base):
     findings_total: Mapped[int] = mapped_column(Integer, default=0)
     findings_new: Mapped[int] = mapped_column(Integer, default=0)
     findings_resolved: Mapped[int] = mapped_column(Integer, default=0)
+    #: Snapshot of the open backlog after the run (drives the dashboard trend).
+    open_findings: Mapped[int | None] = mapped_column(Integer)
+    actionable_findings: Mapped[int | None] = mapped_column(Integer)
+    kev_findings: Mapped[int | None] = mapped_column(Integer)
     errors: Mapped[list[Any]] = mapped_column(default=list)
 
 

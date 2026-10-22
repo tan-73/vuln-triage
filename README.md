@@ -7,7 +7,7 @@ enriches findings with real-world exploit intelligence, ranks them by actual ris
 instead of CVSS alone, and writes a short report: *fix these N things first, here's why,
 here's the fix.*
 
-> Status: under active development. Scanning, enrichment, exposure analysis, risk scoring and the LLM triage agent are complete.
+> Status: under active development. Scanning, enrichment, exposure, scoring, the LLM agent, dashboard, nightly pipeline and alerts are complete.
 
 ## What works today
 
@@ -54,6 +54,16 @@ here's the fix.*
   exposure claim against the tool results, strips anything unsupported, and logs and
   stores the grounding rate. Advisory text is wrapped as untrusted data to guard against
   prompt injection.
+- **Nightly pipeline**: scan → enrich → exposure → score → agent report → alerts, with
+  per-stage timings and a commit after each stage. A failed stage is recorded and does
+  not stop the run. Reports are saved to `reports/YYYY-MM-DD.md` and in the database.
+- **Dashboard** (FastAPI + Jinja2, no external assets, strict CSP): overview with raw vs.
+  actionable counts and trends, ranked remediation groups, assets, finding detail with
+  score breakdown and intel, and rendered reports. Optional basic auth.
+- **Alerts** (Telegram and/or SMTP, off by default) are sent only for *new* KEV-listed or
+  high-risk internet-exposed findings, once per finding.
+
+![Dashboard overview (demo data)](docs/img/dashboard-overview.png)
 
 ```bash
 pip install -e ".[dev]"
@@ -66,6 +76,11 @@ vulntriage score                      # deterministic risk score + remediation g
 vulntriage groups                     # ranked "fix this first" actions
 vulntriage explain 42                 # why finding 42 scored what it did
 vulntriage report                     # LLM report -> reports/YYYY-MM-DD.md
+vulntriage run                        # the whole nightly pipeline once
+vulntriage run --demo                 # same, on bundled fixtures: no Docker/network/API key
+vulntriage serve [--demo]             # dashboard on 127.0.0.1:8080 (+ scheduler if enabled)
+
+docker compose up -d                  # dashboard + nightly scheduler, 127.0.0.1:8080
 vulntriage list-findings --kev
 ```
 

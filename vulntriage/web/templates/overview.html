@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chart, group_row, exposure %}
+{% block content %}
+<section class="tiles">
+  <div class="tile hero">
+    <span class="label">Need action</span>
+    <span class="value">{{ "{:,}".format(head.actionable) }}</span>
+    <span class="muted">of {{ "{:,}".format(head.raw) }} open findings (score ≥ {{ settings.action_threshold }})</span>
+  </div>
+  <div class="tile"><span class="label">Noise filtered</span><span class="value">{% if head.raw %}{{ "%.1f"|format(100 * (head.raw - head.actionable) / head.raw) }}%{% else %}–{% endif %}</span><span class="muted">below the action threshold</span></div>
+  <div class="tile"><span class="label">KEV-listed findings</span><span class="value">{{ head.kev }}</span><span class="muted">known exploited in the wild</span></div>
+  <div class="tile"><span class="label">Internet-exposed assets</span><span class="value">{{ head.internet_assets }}</span><span class="muted">
+    {% for level in ["internet", "lan", "localhost", "none"] %}{{ exposure_counts.get(level, 0) }} {{ level }}{% if not loop.last %} · {% endif %}{% endfor %}</span></div>
+</section>
+
+<section>
+  <h2>Trend</h2>
+  <div class="charts">
+    {% for c in charts %}{{ chart(c) }}{% endfor %}
+  </div>
+</section>
+
+<section>
+  <h2>Fix these first <a class="more" href="/groups">all groups →</a></h2>
+  {% if groups %}
+  <table class="data">
+    <thead><tr><th class="num">#</th><th>Action</th><th>Exposure</th><th class="num">Findings / need action</th><th>KEV</th><th class="num">Top score</th></tr></thead>
+    <tbody>{% for g in groups %}{{ group_row(g, settings.action_threshold) }}{% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">Nothing above the action threshold.</p>{% endif %}
+</section>
+
+<section class="two-col">
+  <div>
+    <h2>Latest run</h2>
+    {% if last_run %}
+    <p>{{ last_run.started_at.strftime("%Y-%m-%d %H:%M") }} UTC · <span class="status-{{ last_run.status }}">{{ last_run.status }}</span> · {{ last_run.trigger }}</p>
+    <table class="data compact"><tbody>
+      {% for stage, secs in last_run.stage_timings.items() %}<tr><td>{{ stage }}</td><td class="num">{{ "%.2f"|format(secs) }} s</td></tr>{% endfor %}
+    </tbody></table>
+    {% for err in last_run.errors[:5] %}<p class="note warn">{{ err }}</p>{% endfor %}
+    {% else %}<p class="muted">No runs yet. Run <code>vulntriage run</code>.</p>{% endif %}
+    {% if latest %}<p><a href="/reports/{{ latest.id }}">Latest report ({{ latest.report_date }})</a>{% if latest.grounding_rate is not none %} · grounding {{ "%.1f"|format(100 * latest.grounding_rate) }}%{% endif %}</p>{% endif %}
+  </div>
+  <div>
+    <h2>Data freshness</h2>
+    <ul class="plain">{% for h in health %}<li>{{ h.describe() }}</li>{% endfor %}</ul>
+  </div>
+</section>
+{% endblock %}

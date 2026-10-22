@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import exposure, kev, score %}
+{% block title %}{{ f.cve_id }} · VulnTriage{% endblock %}
+{% block content %}
+<h1>{{ f.cve_id }} {{ kev(intel and intel.in_kev) }}</h1>
+<p>{{ f.package_name }} <code>{{ f.installed_version }}</code> → {% if f.fixed_version %}<code>{{ f.fixed_version }}</code>{% if f.fixed_version_source %} <span class="muted">({{ f.fixed_version_source }})</span>{% endif %}{% else %}<span class="muted">no fix yet</span>{% endif %}
+ on <a href="/assets/{{ asset.id }}">{{ asset.ref }}</a> {{ exposure(asset.exposure_level) }}</p>
+<p class="muted">{{ f.status }} · first seen {{ f.first_seen.strftime("%Y-%m-%d") }} · last seen {{ f.last_seen.strftime("%Y-%m-%d") }} · scanner {{ f.scanner }} · target <code>{{ f.target }}</code></p>
+
+<section class="two-col">
+<div>
+  <h2>Score {{ score(f.score, settings.action_threshold) }} {% if actionable %}<span class="muted">needs action</span>{% else %}<span class="muted">below threshold</span>{% endif %}</h2>
+  <table class="data compact">
+    <thead><tr><th>Component</th><th>Why</th><th class="num">Points</th></tr></thead>
+    <tbody>
+    {% for c in (f.score_breakdown or {}).get("components", []) %}
+    <tr><td>{{ c.label }}</td><td>{{ c.detail }}</td><td class="num">{{ "%+.2f"|format(c.points) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if f.remediation_key %}<p><a href="/groups">Part of remediation group <code>{{ f.remediation_key }}</code></a></p>{% endif %}
+</div>
+<div>
+  <h2>Threat intel</h2>
+  {% if intel %}
+  <table class="data compact"><tbody>
+    <tr><td>EPSS</td><td>{{ "%.4f"|format(intel.epss) if intel.epss is not none else "–" }}{% if intel.epss_percentile is not none %} (percentile {{ "%.2f"|format(intel.epss_percentile) }}){% endif %}{% if intel.epss_date %} <span class="muted">{{ intel.epss_date }}</span>{% endif %}</td></tr>
+    <tr><td>CISA KEV</td><td>{% if intel.in_kev %}listed {{ intel.kev_date_added }}, due {{ intel.kev_due_date }}{% if intel.ransomware_use %} · <strong>known ransomware use</strong>{% endif %}{% else %}not listed{% endif %}</td></tr>
+    <tr><td>CVSS</td><td>{{ intel.cvss_score if intel.cvss_score is not none else "–" }} <span class="muted">{{ intel.cvss_source or "" }}</span><br><code class="small">{{ intel.cvss_vector or "" }}</code></td></tr>
+    <tr><td>CWE</td><td>{{ intel.cwe or "–" }}</td></tr>
+  </tbody></table>
+  {% if intel.description %}<h3>Description <span class="muted">(third-party text)</span></h3><p class="desc">{{ intel.description }}</p>{% endif %}
+  {% else %}<p class="muted">No intel yet (run <code>vulntriage enrich</code>).</p>{% endif %}
+</div>
+</section>
+{% endblock %}

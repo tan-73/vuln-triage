@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Reports · VulnTriage{% endblock %}
+{% block content %}
+<h1>Reports</h1>
+<table class="data">
+  <thead><tr><th>Date</th><th>Model</th><th class="num">Open</th><th class="num">Need action</th><th class="num">KEV</th><th class="num">Grounding</th><th>Notes</th></tr></thead>
+  <tbody>
+  {% for r in reports %}
+  <tr>
+    <td><a href="/reports/{{ r.id }}">{{ r.report_date }}</a></td>
+    <td>{{ r.provider }}/{{ r.model }}</td>
+    <td class="num">{{ "{:,}".format(r.raw_findings) }}</td><td class="num">{{ r.actionable_findings }}</td><td class="num">{{ r.kev_findings }}</td>
+    <td class="num">{% if r.grounding_rate is not none %}{{ "%.1f"|format(100 * r.grounding_rate) }}% <span class="muted">({{ r.grounding_verified }}/{{ r.grounding_total }})</span>{% else %}–{% endif %}</td>
+    <td>{% if r.error %}<span class="note warn">{{ r.error }}</span>{% elif r.flagged_claims %}{{ r.flagged_claims|length }} claims removed{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">No reports yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

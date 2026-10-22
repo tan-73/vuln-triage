@@ -1,0 +1,38 @@
+# Demo homelab for `vulntriage run --demo` and `vulntriage eval --demo`.
+#
+# Entirely fictional: container names, IPs (192.168.50.0/24) and hostnames (example.com,
+# home.arpa) are placeholders. Scanner output comes from scanning *old public images*
+# with Trivy 0.75.0 / Grype 0.120.0; threat intel is a real public EPSS/KEV/NVD/OSV
+# snapshot (see intel/meta.json). Nothing here describes a real network.
+settings:
+  internet_hostname_patterns: ["*.example.com"]
+  host_lan_ips: ["192.168.50.10"]
+  nginx_config_paths: ["proxy=proxy/nginx"]
+  host_exposure: lan
+
+images:
+  nginx:1.25.1: trivy/nginx_1.25.1.json
+  nginx:1.25.4: trivy/nginx_1.25.4.json
+  gitea/gitea:1.16.0: trivy/gitea_gitea_1.16.0.json
+  grafana/grafana:8.3.0: trivy/grafana_grafana_8.3.0.json
+  postgres:13.2: trivy/postgres_13.2.json
+  redis:6.2.6: trivy/redis_6.2.6.json
+  python:3.11.4-slim: trivy/python_3.11.4-slim.json
+
+grype:
+  redis:6.2.6: grype/redis_6.2.6.json
+
+hosts:
+  nas: trivy/ubuntu_jammy-20230425.json
+
+# Three nightly runs, oldest first. Each starts from docker/containers.json.
+snapshots:
+  - days_ago: 2
+    note: initial deployment (no git server yet)
+    remove_containers: [gitea]
+  - days_ago: 1
+    note: gitea added and exposed at git.example.com
+  - days_ago: 0
+    note: reverse proxy upgraded nginx 1.25.1 -> 1.25.4
+    replace_images:
+      nginx:1.25.1: nginx:1.25.4

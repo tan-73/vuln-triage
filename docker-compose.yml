@@ -1,0 +1,65 @@
+# VulnTriage deployment.  `docker compose up -d`, then open http://127.0.0.1:8080
+#
+# Security model (see README "Security considerations"):
+# - The app never sees the Docker socket. A socket proxy exposes only read-only
+#   container/image GET endpoints on an internal network with no published ports.
+# - The dashboard is published on 127.0.0.1 by default. Set VT_BIND to a LAN or
+#   Tailscale IP to reach it from other machines. Never expose it to the Internet.
+# - No privileged mode; all capabilities dropped; no-new-privileges.
+
+services:
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1   # GET /containers/json (discovery, published ports, labels)
+      IMAGES: 1       # GET /images/... (Trivy exports image layers for scanning)
+      POST: 0         # every write method is refused
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [socket]
+    read_only: true
+    tmpfs: [/tmp, /run, /var/lib/haproxy]
+    security_opt: ["no-new-privileges:true"]
+
+  vulntriage:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        INSTALL_GRYPE: "${INSTALL_GRYPE:-false}"
+    image: vulntriage:local
+    restart: unless-stopped
+    depends_on: [docker-proxy]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DOCKER_HOST: tcp://docker-proxy:2375
+      SCHEDULE_ENABLED: "${SCHEDULE_ENABLED:-true}"
+      DEMO_MODE: "${DEMO_MODE:-false}"
+      # Host OS packages, read from the minimal read-only mounts below:
+      HOST_SCAN_TARGETS: "${HOST_SCAN_TARGETS:-host=/host}"
+    ports:
+      - "${VT_BIND:-127.0.0.1}:${VT_PORT:-8080}:8080"
+    volumes:
+      - vt-data:/data
+      - vt-reports:/reports   # also browsable in the dashboard; copy out with `docker compose cp`
+      # Minimal host view for `trivy rootfs` (Debian/Ubuntu hosts):
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/lib/dpkg:/host/var/lib/dpkg:ro
+      # Reverse-proxy configs for exposure analysis (adjust paths, then set
+      # NGINX_CONFIG_PATHS / CADDY_CONFIG_PATHS in .env), e.g.:
+      # - /srv/npm/data/nginx:/proxy/npm:ro
+      # - /srv/caddy/Caddyfile:/proxy/caddy/Caddyfile:ro
+    networks: [socket, default]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  socket:
+    internal: true   # the proxy is unreachable from anywhere but this stack
+
+volumes:
+  vt-data:
+  vt-reports:

@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}Report {{ report.report_date }} · VulnTriage{% endblock %}
+{% block content %}
+<article class="report">{{ report.markdown | markdown | safe }}</article>
+{% endblock %}
