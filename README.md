@@ -7,7 +7,7 @@ enriches findings with real-world exploit intelligence, ranks them by actual ris
 instead of CVSS alone, and writes a short report: *fix these N things first, here's why,
 here's the fix.*
 
-> Status: under active development. Phase 1 (scanning and ingestion) is complete.
+> Status: under active development. Scanning, ingestion and threat-intel enrichment are complete.
 
 ## What works today
 
@@ -18,11 +18,24 @@ here's the fix.*
   longer reported are marked `resolved`, and they reopen if they come back. Images that
   disappear are retired. A failed scan never resolves anything.
 
+- **Threat-intel enrichment** from FIRST **EPSS**, CISA **KEV**, **NVD 2.0** and **OSV**:
+  - KEV is one download. EPSS is batch-queried (100 CVEs per request). NVD is queried
+    only for CVEs whose CVSS the scanner didn't provide (`NVD_MODE=missing`), under NVD's
+    rate limits (5 requests per 30 s, or 50 with `NVD_API_KEY`) and with a per-run cap.
+    OSV fills in fix versions the scanner didn't know.
+  - Retries use exponential backoff, honour `Retry-After` and retry NVD's 403 rate-limit
+    responses.
+  - **Offline tolerance**: every feed is cached locally with a timestamp and only
+    refetched after its TTL. If a feed is unreachable, or `OFFLINE=true` is set, the cache
+    is used and its age is reported (`vulntriage feeds`).
+
 ```bash
 pip install -e ".[dev]"
 vulntriage scan                       # all running containers + configured hosts
 vulntriage scan --image nginx:1.25.1  # just one image
-vulntriage list-findings --severity high --limit 20
+vulntriage enrich                     # EPSS / KEV / NVD / OSV
+vulntriage feeds                      # cache age and last error per feed
+vulntriage list-findings --kev
 ```
 
 ## Development

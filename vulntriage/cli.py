@@ -76,6 +76,48 @@ def scan(
         console.print(f"[yellow]warning:[/yellow] {err}")
 
 
+@app.command()
+def enrich(
+    offline: Annotated[
+        bool, typer.Option("--offline", help="Use cached feed data only (no network).")
+    ] = False,
+) -> None:
+    """Fetch EPSS, CISA KEV, NVD and OSV data for open findings (cached, rate-limited)."""
+    from vulntriage.intel.enrich import enrich as run_enrich
+
+    settings = get_settings()
+    if offline:
+        settings = settings.model_copy(update={"offline": True})
+    engine = _engine(settings)
+    with session_scope(engine) as session:
+        run = start_run(session, "cli-enrich")
+        with StageTimer(run).stage("enrich"):
+            summary = run_enrich(session, settings)
+        run.errors = summary.errors
+        finish_run(run)
+    console.print(
+        f"enriched [bold]{summary.cves}[/bold] CVEs: {summary.kev_listed} in KEV, "
+        f"{summary.epss_updated} EPSS updated, {summary.nvd_updated} from NVD, "
+        f"{summary.osv_fixes} fix versions from OSV"
+    )
+    for health in summary.health.values():
+        console.print(f"  {health.describe()}")
+    for err in summary.errors:
+        console.print(f"[yellow]warning:[/yellow] {err}")
+
+
+@app.command()
+def feeds() -> None:
+    """Show how fresh each cached threat-intel feed is."""
+    from vulntriage.intel.cache import feed_health
+    from vulntriage.intel.enrich import ttl_map
+
+    settings = get_settings()
+    with session_scope(_engine(settings)) as session:
+        for health in feed_health(session, ttl_map(settings)).values():
+            console.print(health.describe())
+
+
 @app.command("list-findings")
 def list_findings(
     status: Annotated[str, typer.Option(help="open | resolved | all")] = "open",

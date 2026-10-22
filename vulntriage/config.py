@@ -124,6 +124,7 @@ class Settings(BaseSettings):
         description="'missing' only queries NVD for CVEs whose CVSS the scanner did not supply.",
     )
     nvd_max_per_run: int = Field(200, description="Cap on NVD lookups per enrichment run.")
+    osv_max_per_run: int = Field(300, description="Cap on OSV package queries per run.")
     intel_ttl_hours: int = 24
     nvd_ttl_hours: int = 24 * 7
     http_timeout_seconds: float = 30.0
@@ -219,10 +220,8 @@ class Settings(BaseSettings):
                 )
         return value
 
-    def parsed_targets(
-        self, field: Literal["host_scan_targets", "fs_scan_targets"]
-    ) -> list[tuple[str, str]]:
-        """Parse ``name=/path`` pairs. A bare path uses the path as its name."""
+    def parsed_targets(self, field: str) -> list[tuple[str, str]]:
+        """Parse ``name=value`` pairs from a list setting; a bare value is its own name."""
         pairs: list[tuple[str, str]] = []
         for item in getattr(self, field):
             name, sep, path = item.partition("=")
